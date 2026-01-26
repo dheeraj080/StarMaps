@@ -1,33 +1,45 @@
 import React, { useMemo } from "react";
-import * as THREE from "three";
+import { Line } from "@react-three/drei";
+import * as Astronomy from "astronomy-engine";
+import { getVisualVector } from "../utils/scaling";
 
-export default function Orbit({ radius, color }) {
-  // This creates a single, clean circle geometry centered at [0,0,0]
-  const geometry = useMemo(() => {
+const ORBIT_Y_OFFSET = 0.02;
+
+export default function Orbit({
+  planetName,
+  color = "white",
+  orbitalPeriodDays = 365.25,
+  finalOrbitRadius,
+  segments = 256,
+}) {
+  const points = useMemo(() => {
     const pts = [];
-    const segments = 128; // Smoothness
+    const baseDate = new Date(Date.UTC(2000, 0, 1));
+    const period = Number(orbitalPeriodDays) || 365.25;
 
     for (let i = 0; i <= segments; i++) {
-      const angle = (i / segments) * Math.PI * 2;
-      pts.push(
-        new THREE.Vector3(
-          Math.cos(angle) * radius,
-          0,
-          Math.sin(angle) * radius,
-        ),
-      );
+      const t = i / segments;
+      const sampleDate = new Date(baseDate.getTime() + t * period * 86400000);
+
+      const posAu = Astronomy.HelioVector(planetName, sampleDate);
+      const { direction } = getVisualVector(posAu);
+
+      const p = direction.clone().multiplyScalar(finalOrbitRadius);
+      p.y += ORBIT_Y_OFFSET;
+      pts.push(p);
     }
-    return new THREE.BufferGeometry().setFromPoints(pts);
-  }, [radius]);
+
+    return pts;
+  }, [planetName, orbitalPeriodDays, finalOrbitRadius, segments]);
 
   return (
-    <line geometry={geometry}>
-      <lineBasicMaterial
-        color={color || "#ffffff"}
-        transparent
-        opacity={0.25}
-        linewidth={1}
-      />
-    </line>
+    <Line
+      points={points}
+      color={color}
+      lineWidth={1}
+      transparent
+      opacity={0.35}
+      depthWrite={false}
+    />
   );
 }

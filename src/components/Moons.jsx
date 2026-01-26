@@ -2,67 +2,113 @@ import React, { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
-import { radiusScale, SCALING_CONFIG } from "../utils/scaling";
+import { SCALING_CONFIG } from "../utils/scaling";
 
-export default function Moon({ satelliteData }) {
+const DEG2RAD = Math.PI / 180;
+
+// --- Visual tuning ---
+const MOON_LOG_DISTANCE_SCALE = 14; // smaller than planets
+const MOON_LOG_SIZE_SCALE = 0.35; // non-linear size
+const MIN_CLEARANCE_MULT = 2.2; // planetRadius * this (prevents clipping)
+const EXTRA_CLEARANCE = 2.0; // constant padding (scene units)
+const ORBIT_SPEED_MULT = 0.6; // slow down visually
+
+function scaleMoonDistanceKmToScene(km) {
+  // Non-linear distance compression for moon distances (km)
+  return Math.log10(km + 1) * MOON_LOG_DISTANCE_SCALE;
+}
+
+function scaleMoonRadiusKmToScene(radiusKm) {
+  // Non-linear size mapping: log keeps small moons visible
+  return Math.log10(radiusKm + 1) * MOON_LOG_SIZE_SCALE;
+}
+
+export default function Moon({ satelliteData, parentVisualRadius = 10 }) {
   const moonRef = useRef();
 
-  // 1. Implementation of createThreediameter()
-  // Uses the < 300km "boost" logic and divides by 2 for diameter
-  const diameter = useMemo(() => {
-    if (satelliteData.diameter < 300) {
-      return satelliteData.diameter * 0.0007;
-    }
-    return satelliteData.diameter * radiusScale;
-  }, [satelliteData.diameter]);
-
-  // 2. Load texture
   const texturePath =
     satelliteData._3d?.textures?.base || "/textures/default_moon.jpg";
   const texture = useTexture(texturePath);
 
-  // 3. Dynamic Segments based on size (Implementation of your segmentsOffset logic)
+  // --- Visual radius (non-linear) ---
+  const visualRadius = useMemo(() => {
+    const radiusKm = (satelliteData.diameter || 1) / 2;
+    // Keep a minimum size so tiny moons don’t vanish
+    return Math.max(0.6, scaleMoonRadiusKmToScene(radiusKm));
+  }, [satelliteData.diameter]);
+
+  // --- Orbit distance (non-linear + clearance so it never clips parent) ---
+  const orbitRadius = useMemo(() => {
+    const dKm = satelliteData.distanceFromParent || 1;
+    const raw = scaleMoonDistanceKmToScene(dKm);
+
+    const minSafe =
+      parentVisualRadius * MIN_CLEARANCE_MULT + visualRadius + EXTRA_CLEARANCE;
+
+    return Math.max(raw, minSafe);
+  }, [satelliteData.distanceFromParent, parentVisualRadius, visualRadius]);
+
+  // --- Orbit plane tilt (optional but helps avoid overlaps) ---
+  const inclinationRad = useMemo(() => {
+    const inc = satelliteData.orbitalInclination || 0;
+    return inc * DEG2RAD;
+  }, [satelliteData.orbitalInclination]);
+
+  // Slightly different planes per moon to reduce collisions
+  const orbitPlane = useMemo(() => {
+    // Tilt around X by inclination, and add a tiny Y tilt based on id for variety
+    const jitter = (String(satelliteData.id || "").charCodeAt(0) || 1) * 0.0005;
+    const m = new THREE.Matrix4()
+      .makeRotationX(inclinationRad)
+      .multiply(new THREE.Matrix4().makeRotationY(jitter));
+    return m;
+  }, [inclinationRad, satelliteData.id]);
+
+  // --- Geometry detail (cap segments for performance) ---
   const segments = useMemo(() => {
-    return Math.floor(diameter * 2 + 1 * 35);
-  }, [diameter]);
+    const s = Math.round(visualRadius * 10) + 12;
+    return Math.min(48, Math.max(16, s));
+  }, [visualRadius]);
 
   useFrame(({ clock }) => {
-    if (moonRef.current) {
-      // 4. Implementation of createThreeDistanceFromParent()
-      // Uses the standard orbit scale (10^-4.2)
-      //const orbitScale = Math.pow(10, -2.2);
-      //const distance = satelliteData.distanceFromParent * orbitScale;
+    if (!moonRef.current) return;
 
-      const distance = Math.log10(satelliteData.distanceFromParent + 1) * 40;
+    // Period in days from JSON; fallback to Moon ~27.3 days
+    const period = satelliteData.orbitalPeriod || 27.3;
+    const orbitSpeed = (2 * Math.PI) / period;
 
-      // 5. Orbital Speed logic (Slowed down for visual comfort)
-      const orbitSpeed = (2 * Math.PI) / (satelliteData.orbitalPeriod || 27.3);
-      const angle = clock.elapsedTime * orbitSpeed * 0.5;
+    // Time simulation
+    const t =
+      clock.elapsedTime *
+      orbitSpeed *
+      ORBIT_SPEED_MULT *
+      (SCALING_CONFIG?.TIME_SPEED ? 0.001 : 1); // keep stable if TIME_SPEED is huge
 
-      // 6. Set local position relative to the planet center
-      moonRef.current.position.set(
-        Math.cos(angle) * distance,
-        0, // You can add Math.sin(angle) * inclination if you want 3D orbits
-        Math.sin(angle) * distance,
-      );
+    // Base orbit in XZ plane
+    const local = new THREE.Vector3(
+      Math.cos(t) * orbitRadius,
+      0,
+      Math.sin(t) * orbitRadius,
+    );
 
-      // 7. Slowed Rotation (Implementation of "slower rotation" request)
-      moonRef.current.rotation.y += 0.002;
-    }
+    // Tilt orbit plane
+    local.applyMatrix4(orbitPlane);
+
+    moonRef.current.position.copy(local);
+
+    // Slow spin
+    moonRef.current.rotation.y += 0.003;
   });
 
   return (
     <mesh ref={moonRef}>
-      {/* Dynamic geometry based on moon size */}
-      <sphereGeometry args={[diameter, segments, segments]} />
-
-      {/* Implementation of MeshLambertMaterial equivalent for performance */}
+      <sphereGeometry args={[visualRadius, segments, segments]} />
       <meshStandardMaterial
         map={texture}
-        roughness={0.8}
-        metalness={0.1}
+        roughness={0.85}
+        metalness={0.05}
         emissive={new THREE.Color("#ffffff")}
-        emissiveIntensity={0.15} // Ensures small moons are visible in shadow
+        emissiveIntensity={0.12}
       />
     </mesh>
   );
