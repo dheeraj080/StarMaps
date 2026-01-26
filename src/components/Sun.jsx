@@ -1,7 +1,7 @@
 import React from "react";
 
 export default function Sun({ data }) {
-  const radius = data.diameter * Math.pow(10, -3.8);
+  const radius = data.diameter * Math.pow(10, -2.8);
 
   return (
     <mesh>

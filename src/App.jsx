@@ -1,7 +1,7 @@
 import React, { useState, Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import solarData from "./data/solarsystem.json";
-import SolarCamera from "./components/Camera";
+import Camera from "./components/Camera";
 import Sun from "./components/Sun";
 import Planet from "./components/Planets";
 import SolarControls from "./components/SolarControls";
@@ -36,7 +36,7 @@ export default function App() {
             Everything inside will stay hidden until ALL textures are loaded.
         */}
         <Suspense fallback={null}>
-          <SolarCamera />
+          <Camera />
 
           <Sun data={solarData.parent} />
 
