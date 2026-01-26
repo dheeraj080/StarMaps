@@ -11,7 +11,7 @@ export default function SolarCamera() {
         minDistance={50}
       />
 
-      <Stars radius={20000} depth={2000} count={20000} factor={7} fade />
+      <Stars radius={50000} depth={2000} count={20000} factor={7} fade />
 
       <ambientLight intensity={0.2} />
       {/* Increased intensity and distance to reach the outer planets */}

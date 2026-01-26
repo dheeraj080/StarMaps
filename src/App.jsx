@@ -31,7 +31,7 @@ export default function App() {
         currentSpeed={timeSpeed}
       />
 
-      <Canvas camera={{ position: [0, 5000, 15000], near: 10, far: 2000000 }}>
+      <Canvas camera={{ position: [0, 20000, 20000], near: 10, far: 2000000 }}>
         {/* The Suspense boundary is CRITICAL here. 
             Everything inside will stay hidden until ALL textures are loaded.
         */}
@@ -40,10 +40,10 @@ export default function App() {
 
           <Sun data={solarData.parent} />
 
-          {solarData.planets.map((p) => (
+          {solarData.planets.map((p, i) => (
             <Planet
               key={p.id}
-              data={p}
+              data={{ ...p, index: i }}
               baseDate={targetDate}
               speed={timeSpeed}
             />
