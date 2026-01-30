@@ -2,7 +2,7 @@ import * as THREE from "three";
 
 
 export const SCALING_CONFIG = {
-  LOG_DISTANCE_SCALE: 1200,     // visual spread
+  LOG_DISTANCE_SCALE: 900,     // visual spread
   AU_TO_KM: 149597870.7,
   TIME_SPEED: 1000,
 };

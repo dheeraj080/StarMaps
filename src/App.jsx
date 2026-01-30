@@ -5,6 +5,11 @@ import Camera from "./components/Camera";
 import Sun from "./components/Sun";
 import Planet from "./components/Planets";
 import SolarControls from "./components/SolarControls";
+import {
+  EffectComposer,
+  Bloom,
+  ToneMapping,
+} from "@react-three/postprocessing";
 
 // A simple loading component so the screen isn't just black
 function Loader() {
@@ -32,6 +37,14 @@ export default function App() {
       />
 
       <Canvas camera={{ position: [0, 20000, 20000], near: 10, far: 2000000 }}>
+        <EffectComposer>
+          <Bloom
+            intensity={1.5}
+            luminanceThreshold={0.9} // Only objects with high emissive/brightness will glow
+            mipmapBlur
+          />
+          <ToneMapping exposure={1.2} />
+        </EffectComposer>
         {/* The Suspense boundary is CRITICAL here. 
             Everything inside will stay hidden until ALL textures are loaded.
         */}
@@ -39,7 +52,13 @@ export default function App() {
           <Camera />
 
           <Sun data={solarData.parent} />
-
+          <pointLight
+            position={[0, 0, 0]}
+            intensity={2.5}
+            decay={0}
+            castShadow
+          />
+          <ambientLight intensity={0.1} />
           {solarData.planets.map((p, i) => (
             <Planet
               key={p.id}

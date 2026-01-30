@@ -1,45 +1,49 @@
 import React, { useMemo } from "react";
-import { Line } from "@react-three/drei";
 import * as Astronomy from "astronomy-engine";
-import { getVisualVector } from "../utils/scaling";
+import * as THREE from "three";
+import { SCALING_CONFIG } from "../utils/scaling";
 
-const ORBIT_Y_OFFSET = 0.02;
+export default function Orbit({ planetName, color, orbitalPeriodDays }) {
+  const orbitPoints = useMemo(() => {
+    const points = [];
+    const numPoints = 500;
+    const logScale = 25000; // Must match the hook exactly
+    const period = orbitalPeriodDays || 365;
+    const refDate = new Date(Date.UTC(2000, 0, 1));
 
-export default function Orbit({
-  planetName,
-  color = "white",
-  orbitalPeriodDays = 365.25,
-  finalOrbitRadius,
-  segments = 256,
-}) {
-  const points = useMemo(() => {
-    const pts = [];
-    const baseDate = new Date(Date.UTC(2000, 0, 1));
-    const period = Number(orbitalPeriodDays) || 365.25;
+    for (let i = 0; i < numPoints; i++) {
+      const dayOffset = (i / numPoints) * period;
+      const date = new Date(
+        refDate.getTime() + dayOffset * 24 * 60 * 60 * 1000,
+      );
 
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments;
-      const sampleDate = new Date(baseDate.getTime() + t * period * 86400000);
+      const posAu = Astronomy.HelioVector(planetName, date);
 
-      const posAu = Astronomy.HelioVector(planetName, sampleDate);
-      const { direction } = getVisualVector(posAu);
+      // Calculate distance and apply log
+      const rawDistance = Math.sqrt(posAu.x ** 2 + posAu.y ** 2 + posAu.z ** 2);
+      const visualDistance = Math.log10(rawDistance + 1) * logScale;
 
-      const p = direction.clone().multiplyScalar(finalOrbitRadius);
-      p.y += ORBIT_Y_OFFSET;
-      pts.push(p);
+      // Map to 3D space
+      const direction = new THREE.Vector3(
+        posAu.x,
+        posAu.z,
+        posAu.y,
+      ).normalize();
+      points.push(direction.multiplyScalar(visualDistance));
     }
 
-    return pts;
-  }, [planetName, orbitalPeriodDays, finalOrbitRadius, segments]);
+    return new THREE.BufferGeometry().setFromPoints(points);
+  }, [planetName, orbitalPeriodDays]);
 
   return (
-    <Line
-      points={points}
-      color={color}
-      lineWidth={1}
-      transparent
-      opacity={0.35}
-      depthWrite={false}
-    />
+    // 3. Use lineLoop to automatically close the gap between last and first point
+    <lineLoop geometry={orbitPoints}>
+      <lineBasicMaterial
+        color={color || "#555555"}
+        transparent
+        opacity={0.2}
+        linewidth={1}
+      />
+    </lineLoop>
   );
 }

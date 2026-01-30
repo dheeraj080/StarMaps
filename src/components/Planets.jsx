@@ -1,83 +1,94 @@
-import React, { useRef, useMemo, useState } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
-import { Html, useTexture } from "@react-three/drei";
-import * as Astronomy from "astronomy-engine";
+import React, { useMemo, useRef, useCallback } from "react";
+import { Html, Line } from "@react-three/drei";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { getVisualVector, SCALING_CONFIG } from "../utils/scaling";
+
 import Moon from "./Moons";
 import Orbit from "./Orbit";
-import { easing } from "maath";
+import { usePlanetLogic } from "../hooks/usePlanetLogic";
 
-const SAFE_GAP = 5000;
-const ORBIT_PADDING_FACTOR = 5.5;
+const getLabelStyle = (borderColor) => ({
+  fontSize: "40px",
+  fontWeight: 800,
+  color: "white",
+  background: "rgba(0,0,0,0.8)",
+  padding: "8px 20px",
+  borderRadius: "10px",
+  border: `2px solid ${borderColor || "white"}`,
+  cursor: "pointer",
+  userSelect: "none",
+  pointerEvents: "auto",
+  whiteSpace: "nowrap",
+});
+
+function PlanetAxis({ radius, colorNorth = "cyan", colorSouth = "orange" }) {
+  const len = radius * 1.6;
+
+  return (
+    <>
+      <Line
+        points={[
+          [0, 0, 0],
+          [0, len, 0],
+        ]}
+        color={colorNorth}
+        lineWidth={3}
+      />
+      <Line
+        points={[
+          [0, 0, 0],
+          [0, -len, 0],
+        ]}
+        color={colorSouth}
+        lineWidth={2}
+      />
+    </>
+  );
+}
 
 export default function Planet({ data }) {
-  const groupRef = useRef();
-  const { controls } = useThree();
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const {
+    groupRef, // orbital position group
+    visualRadius,
+    finalOrbitRadius,
+    texture,
+    handlePlanetClick,
+    axialTiltRad,
+  } = usePlanetLogic(data);
 
-  // Visual planet size (keep your current formula)
-  const visualRadius = useMemo(() => {
-    return Math.pow(data.diameter, 0.4) * 25;
-  }, [data.diameter]);
+  const spinRef = useRef(null);
 
-  const texture = useTexture(
-    data._3d?.textures?.base || "/textures/default_planet.jpg",
+  const spinSpeed = data?.rotationSpeed ?? 0.25;
+
+  useFrame((_, delta) => {
+    if (spinRef.current) spinRef.current.rotation.y += delta * spinSpeed;
+  });
+
+  const emissiveColor = useMemo(() => new THREE.Color("#111111"), []);
+  const labelStyle = useMemo(() => getLabelStyle(data?.color), [data?.color]);
+
+  const labelPosition = useMemo(() => {
+    const y = Math.max(visualRadius + 20, visualRadius * 1.35);
+    return [0, y, 0];
+  }, [visualRadius]);
+
+  const onPlanetClick = useCallback(
+    (e) => {
+      e?.stopPropagation?.();
+      handlePlanetClick(e);
+    },
+    [handlePlanetClick],
   );
 
-  // ✅ Orbit radius computed INSIDE planet (old behavior)
-  const finalOrbitRadius = useMemo(() => {
-    const posAu = Astronomy.HelioVector(
-      data.name,
-      new Date(Date.UTC(2000, 0, 1)),
-    );
-    const { radius } = getVisualVector(posAu);
-
-    return (
-      radius * 2 +
-      visualRadius * ORBIT_PADDING_FACTOR +
-      (data.index || 0) * SAFE_GAP
-    );
-  }, [data.name, data.index, visualRadius]);
-
-  const handlePlanetClick = (e) => {
-    e.stopPropagation();
-    setIsTransitioning(true);
-  };
-
-  useFrame((state, delta) => {
-    if (!groupRef.current) return;
-
-    const date = new Date(
-      Date.now() + state.clock.elapsedTime * 1000 * SCALING_CONFIG.TIME_SPEED,
-    );
-
-    const posAu = Astronomy.HelioVector(data.name, date);
-    const { direction } = getVisualVector(posAu);
-
-    // ✅ Put planet on its orbit ring band (same as before)
-    groupRef.current.position.copy(
-      direction.clone().multiplyScalar(finalOrbitRadius),
-    );
-
-    // Optional smooth fly-to behavior (kept)
-    if (isTransitioning && controls) {
-      const worldPos = new THREE.Vector3();
-      groupRef.current.getWorldPosition(worldPos);
-
-      easing.damp3(controls.target, worldPos, 0.3, delta);
-
-      const offset = new THREE.Vector3(0, visualRadius * 2, visualRadius * 6);
-      const idealPos = worldPos.clone().add(offset);
-      easing.damp3(state.camera.position, idealPos, 0.3, delta);
-
-      if (state.camera.position.distanceTo(idealPos) < 1) {
-        setIsTransitioning(false);
+  const onLabelKeyDown = useCallback(
+    (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onPlanetClick(e);
       }
-    }
-
-    groupRef.current.rotation.y += 0.002;
-  });
+    },
+    [onPlanetClick],
+  );
 
   return (
     <>
@@ -88,33 +99,41 @@ export default function Planet({ data }) {
         finalOrbitRadius={finalOrbitRadius}
       />
 
+      {/* Main Group: orbital position */}
       <group ref={groupRef}>
-        <mesh onClick={handlePlanetClick}>
-          <sphereGeometry args={[visualRadius, 64, 64]} />
-          <meshStandardMaterial map={texture} roughness={0.7} metalness={0.2} />
-        </mesh>
+        {/* Tilt Group: axial tilt */}
+        <group rotation={[0, 0, axialTiltRad]}>
+          {/* Spin Group: rotates around the (tilted) Y axis */}
+          <group ref={spinRef}>
+            <PlanetAxis radius={visualRadius} />
 
-        <Html
-          position={[0, visualRadius + 20, 0]}
-          center
-          distanceFactor={1000}
-          sprite
-          occlude={false}
-        >
+            <mesh
+              name="planet-mesh"
+              onClick={onPlanetClick}
+              castShadow
+              receiveShadow
+            >
+              <sphereGeometry args={[visualRadius, 64, 64]} />
+              <meshStandardMaterial
+                map={texture}
+                roughness={0.6}
+                metalness={0.2}
+                emissive={emissiveColor}
+                emissiveIntensity={0.5}
+              />
+            </mesh>
+          </group>
+        </group>
+
+        <Html position={labelPosition} center sprite distanceFactor={1000}>
           <div
-            onClick={handlePlanetClick}
-            style={{
-              fontSize: "40px",
-              fontWeight: "bold",
-              color: "white",
-              background: "rgba(0,0,0,0.8)",
-              padding: "8px 20px",
-              borderRadius: "8px",
-              border: `2px solid ${data.color || "white"}`,
-              cursor: "pointer",
-              userSelect: "none",
-              pointerEvents: "auto",
-            }}
+            role="button"
+            tabIndex={0}
+            onClick={onPlanetClick}
+            onKeyDown={onLabelKeyDown}
+            style={labelStyle}
+            aria-label={`Select planet ${data.name}`}
+            title={`Select ${data.name}`}
           >
             {data.name}
           </div>
