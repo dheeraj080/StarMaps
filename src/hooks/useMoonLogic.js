@@ -1,77 +1,59 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { SIM_CONFIG } from "../utils/SCALING_CONFIG";
 
 export function useMoonLogic(satelliteData, parentVisualRadius) {
   const moonRef = useRef(null);
-  
-  // 1. Physical Constants
-  const { diameterKm, distanceKm, periodDays, inclDeg } = useMemo(() => ({
-    diameterKm: satelliteData?.diameter ?? 1000,
-    distanceKm: satelliteData?.distanceFromParent ?? 100000,
-    periodDays: satelliteData?.orbitalPeriod ?? 30,
-    inclDeg: satelliteData?.orbitalInclination ?? 0,
-  }), [satelliteData]);
-
   const earthRadiusKm = 6378;
 
-  // 2. Initial Start Position (Seed based on name so they don't line up)
+  // 1. Stable Random Start Phase
   const startPhase = useMemo(() => {
     const seed = satelliteData?.name || "moon";
     let hash = 0;
-    for (let i = 0; i < seed.length; i++) {
-      hash = (hash << 5) - hash + seed.charCodeAt(i);
-      hash |= 0; 
-    }
+    for (let i = 0; i < seed.length; i++) hash = (hash << 5) - hash + seed.charCodeAt(i);
     return (Math.abs(hash) % 360) * (Math.PI / 180);
   }, [satelliteData?.name]);
 
   const thetaRef = useRef(startPhase);
 
-  // 3. Visual Size & Orbit Radius
-  const moonRadius = useMemo(() => {
-    const rKm = diameterKm / 2;
-    const ratioToEarthRadius = rKm / earthRadiusKm;
-    const r = parentVisualRadius * ratioToEarthRadius;
-    return THREE.MathUtils.clamp(r, parentVisualRadius * 0.06, parentVisualRadius * 0.4);
-  }, [diameterKm, parentVisualRadius]);
+  // 2. Advanced Scaling for Radius and Orbit
+  const { moonRadius, orbitRadius } = useMemo(() => {
+    // Diameter: Power scaling makes tiny moons visible
+    const rKm = (satelliteData?.diameter ?? 1000) / 2;
+    const mRadius = THREE.MathUtils.clamp(
+      Math.pow(rKm, 0.5) * 1.5, 
+      parentVisualRadius * 0.08, 
+      parentVisualRadius * 0.4
+    );
 
-  const orbitRadius = useMemo(() => {
-  // 1. Calculate the "Real" distance scaled down
-  const distanceInEarthRadii = distanceKm / earthRadiusKm;
-  let r = parentVisualRadius * distanceInEarthRadii;
-  
-  // 2. Calculate the "Minimum Safe Distance"
-  // This is the Planet's Visual Radius + Moon's Visual Radius + a clear gap
-  const surfaceGap = parentVisualRadius + moonRadius + (parentVisualRadius * 0.5); 
+    // Orbit: Ensure it is far enough to clear planet, but not so far it hits next orbit
+    const realOrbit = parentVisualRadius * ((satelliteData?.distanceFromParent ?? 100000) / earthRadiusKm);
+    const surfaceGap = (parentVisualRadius * SIM_CONFIG.MOON_SURFACE_GAP) + mRadius;
+    
+    // CLAMP: Keep moons within a "Safety Bubble" (max 8x planet radius)
+    const maxLimit = parentVisualRadius * 8; 
+    return { moonRadius: mRadius, orbitRadius: THREE.MathUtils.clamp(realOrbit, surfaceGap, maxLimit) };
+  }, [satelliteData, parentVisualRadius]);
 
-  // 3. LOGARITHMIC BOOST (The Magic Fix)
-  // If the moon is very close (like Phobos or Io), 
-  // the real ratio will be too small. We use Math.max to force it out.
-  return Math.max(r, surfaceGap);
-}, [distanceKm, parentVisualRadius, moonRadius]);
+  const inclinationRad = useMemo(() => 
+    THREE.MathUtils.degToRad(satelliteData?.orbitalInclination ?? 0), 
+  [satelliteData?.orbitalInclination]);
 
-  const inclinationRad = useMemo(() => THREE.MathUtils.degToRad(inclDeg), [inclDeg]);
-
-  // 4. Animation Loop
+  // 3. Animation: Synchronized Global Speed
   useFrame((state, delta) => {
     if (!moonRef.current) return;
 
-    // Use a global time scale if available, otherwise 15
-    const timeScale = state.timeScale || 15; 
-    const angularSpeed = (Math.PI * 2 * timeScale) / periodDays;
-    
+    const angularSpeed = (Math.PI * 2 / (satelliteData?.orbitalPeriod ?? 30)) * SIM_CONFIG.TIME_STEP;
     thetaRef.current += angularSpeed * delta;
 
-    // Position on the X-Z plane (The parent group in JSX will handle the tilt)
     moonRef.current.position.set(
       Math.cos(thetaRef.current) * orbitRadius,
       0,
       Math.sin(thetaRef.current) * orbitRadius
     );
 
-    // Tidal Locking: Look back at the planet
-    // We adjust by PI/2 because Three.js textures usually face the +Z axis
+    // Tidal Locking: Faces planet center
     moonRef.current.rotation.y = -thetaRef.current + Math.PI / 2;
   });
 

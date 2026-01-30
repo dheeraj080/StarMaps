@@ -7,32 +7,35 @@ import Moon from "./Moons";
 import Orbit from "./Orbit";
 import { usePlanetLogic } from "../hooks/usePlanetLogic";
 
+// Scoped style outside the component to prevent re-creation on render
 const getLabelStyle = (borderColor) => ({
   fontSize: "40px",
   fontWeight: 800,
   color: "white",
-  background: "rgba(0,0,0,0.8)",
-  padding: "8px 20px",
-  borderRadius: "10px",
-  border: `2px solid ${borderColor || "white"}`,
+  background: "rgba(0,0,0,0.85)",
+  padding: "10px 24px",
+  borderRadius: "12px",
+  border: `3px solid ${borderColor || "white"}`,
   cursor: "pointer",
   userSelect: "none",
   pointerEvents: "auto",
   whiteSpace: "nowrap",
+  boxShadow: "0px 0px 15px rgba(0,0,0,0.5)",
 });
 
 function PlanetAxis({ radius, colorNorth = "cyan", colorSouth = "orange" }) {
-  const len = radius * 1.6;
-
+  const len = radius * 1.8; // Slightly longer than the visual radius
   return (
-    <>
+    <group name="axis-lines">
       <Line
         points={[
           [0, 0, 0],
           [0, len, 0],
         ]}
         color={colorNorth}
-        lineWidth={3}
+        lineWidth={2}
+        transparent
+        opacity={0.6}
       />
       <Line
         points={[
@@ -41,53 +44,54 @@ function PlanetAxis({ radius, colorNorth = "cyan", colorSouth = "orange" }) {
         ]}
         color={colorSouth}
         lineWidth={2}
+        transparent
+        opacity={0.6}
       />
-    </>
+    </group>
   );
 }
 
 export default function Planet({ data }) {
   const {
-    groupRef, // orbital position group
+    groupRef,
     visualRadius,
     finalOrbitRadius,
     texture,
     handlePlanetClick,
     axialTiltRad,
+    timeScale = 1, // Normalized timeScale (1 = 1s/day)
   } = usePlanetLogic(data);
 
   const spinRef = useRef(null);
 
-  const spinSpeed = data?.rotationSpeed ?? 0.25;
+  // Calculate angular velocity: (2π radians / rotationPeriod) * timeMultiplier
+  const spinSpeed = useMemo(() => {
+    const period = data?.rotationPeriod || 1; // Default to 1 day if undefined
+    return (Math.PI * 2 * timeScale) / period;
+  }, [data?.rotationPeriod, timeScale]);
 
   useFrame((_, delta) => {
-    if (spinRef.current) spinRef.current.rotation.y += delta * spinSpeed;
+    if (spinRef.current) {
+      // delta ensures movement is frame-rate independent
+      spinRef.current.rotation.y += delta * spinSpeed;
+    }
   });
 
-  const emissiveColor = useMemo(() => new THREE.Color("#111111"), []);
+  const emissiveColor = useMemo(() => new THREE.Color("#050505"), []);
   const labelStyle = useMemo(() => getLabelStyle(data?.color), [data?.color]);
 
-  const labelPosition = useMemo(() => {
-    const y = Math.max(visualRadius + 20, visualRadius * 1.35);
-    return [0, y, 0];
-  }, [visualRadius]);
+  // Position label significantly above the north pole to avoid axis line overlap
+  const labelPosition = useMemo(
+    () => [0, visualRadius * 2.2, 0],
+    [visualRadius],
+  );
 
   const onPlanetClick = useCallback(
     (e) => {
       e?.stopPropagation?.();
-      handlePlanetClick(e);
+      handlePlanetClick(data); // Pass data back to the handler for the "Fly-to" logic
     },
-    [handlePlanetClick],
-  );
-
-  const onLabelKeyDown = useCallback(
-    (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        onPlanetClick(e);
-      }
-    },
-    [onPlanetClick],
+    [handlePlanetClick, data],
   );
 
   return (
@@ -99,11 +103,11 @@ export default function Planet({ data }) {
         finalOrbitRadius={finalOrbitRadius}
       />
 
-      {/* Main Group: orbital position */}
+      {/* 1. POSITION GROUP: Position in space (Controlled by Astronomy Engine) */}
       <group ref={groupRef}>
-        {/* Tilt Group: axial tilt */}
+        {/* 2. TILT GROUP: Static tilt applied once */}
         <group rotation={[0, 0, axialTiltRad]}>
-          {/* Spin Group: rotates around the (tilted) Y axis */}
+          {/* 3. SPIN GROUP: This is what rotates daily */}
           <group ref={spinRef}>
             <PlanetAxis radius={visualRadius} />
 
@@ -116,34 +120,35 @@ export default function Planet({ data }) {
               <sphereGeometry args={[visualRadius, 64, 64]} />
               <meshStandardMaterial
                 map={texture}
-                roughness={0.6}
-                metalness={0.2}
+                roughness={0.7}
+                metalness={0.1}
                 emissive={emissiveColor}
-                emissiveIntensity={0.5}
               />
             </mesh>
           </group>
         </group>
 
-        <Html position={labelPosition} center sprite distanceFactor={1000}>
+        {/* 4. UI LABEL: Always stays "up" relative to the solar system center */}
+        <Html position={labelPosition} center sprite distanceFactor={1200}>
           <div
             role="button"
             tabIndex={0}
             onClick={onPlanetClick}
-            onKeyDown={onLabelKeyDown}
             style={labelStyle}
-            aria-label={`Select planet ${data.name}`}
-            title={`Select ${data.name}`}
+            aria-label={`Select ${data.name}`}
           >
             {data.name}
           </div>
         </Html>
 
+        {/* 5. MOONS: Nested in position group so they follow the planet,
+            but outside the spin group so they don't whip around the planet's surface */}
         {data.satellites?.map((moon) => (
           <Moon
             key={moon.id}
             satelliteData={moon}
             parentVisualRadius={visualRadius}
+            timeScale={timeScale}
           />
         ))}
       </group>

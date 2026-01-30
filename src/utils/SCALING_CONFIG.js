@@ -1,11 +1,6 @@
 // utils/SCALING_CONFIG.js
-export const SCALING_CONFIG = {
-  // 1 unit of real time (1s) = 10 days in simulation
-  TIME_SPEED: 10, 
-  
-  // Controls how far apart planets are from the Sun
-  DISTANCE_SCALE: 25000, 
-  
-  // Controls the "Minimum Gap" for moons to prevent clipping
-  MOON_SURFACE_GAP: 1.5, 
+export const SIM_CONFIG = {
+  TIME_STEP: 0.001,         // 0.1 = 10 real seconds per 1 simulation day
+  DISTANCE_SCALE: 25000,
+  MOON_SURFACE_GAP: 1.5,  // Multiplier to keep moons outside planet meshes
 };
