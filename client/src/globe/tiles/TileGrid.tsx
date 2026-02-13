@@ -52,7 +52,7 @@ export function TileGrid({
     const { lat, lon } = ecefToLatLon(hit);
 
     const dist = camera.position.length();
-    const z = clamp(Math.round(8 - Math.log2(dist / radius)), minZoom, maxZoom);
+    const z = clamp(Math.round(5 - Math.log2(dist / radius)), minZoom, maxZoom);
     const { x, y } = latLonToTileXY(lat, lon, z);
 
     setCenter((prev) =>
@@ -87,7 +87,7 @@ export function TileGrid({
     return Array.from(map.values());
   }, [center, ring]);
 
-  console.log("tiles", center, tiles.length);
+  console.log("TileGrid center:", center, "tiles:", tiles.length);
 
   return (
     <group>
@@ -107,6 +107,8 @@ export function TileGrid({
             y={t.y}
             radius={radius}
             urlTemplate={urlTemplate}
+            segments={24} // higher-res mesh for close view
+            radiusMul={1.01} // sits above base tiles
           />
         </React.Suspense>
       ))}
