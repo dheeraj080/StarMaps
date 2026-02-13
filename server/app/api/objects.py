@@ -139,3 +139,23 @@ async def ephemeris(
 
     await db.commit()
     return {"cached": False, "results": vectors}
+
+
+@router.get("")
+async def list_objects(db: AsyncSession = Depends(get_db)):
+    rows = (
+        (
+            await db.execute(
+                text(
+                    """
+        SELECT id, kind, name, source, source_key
+        FROM objects
+        ORDER BY kind, name
+    """
+                )
+            )
+        )
+        .mappings()
+        .all()
+    )
+    return {"results": [dict(r) for r in rows]}
