@@ -1,95 +1,151 @@
+/* 1. CORE RESET & THEMING */
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
+  color-scheme: dark;
+  background-color: #000005; /* Deep space black */
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
 }
 
 body {
   margin: 0;
+  overflow: hidden; /* Prevents scrollbars from 3D scene */
+  width: 100vw;
+  height: 100vh;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+/* 2. FIXED HUD SEARCH (TOP RIGHT) */
+.hud-search-container {
+  position: absolute; /* Relative to the 100vw/100vh container */
+  top: 30px;
+  right: 30px;
+  width: 240px;
+  pointer-events: auto; /* Re-enables clicking the input */
+  z-index: 10000;
+}
+
+.search-input-wrapper {
   display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
-}
-
-.sat-card {
-  background: rgba(0, 20, 40, 0.8);
+  flex-direction: row-reverse; /* Icon on the right */
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 242, 255, 0.3);
+  background: rgba(0, 10, 20, 0.6);
   backdrop-filter: blur(10px);
-  border: 1px solid #00f2ff;
-  border-left: 5px solid #00f2ff;
-  color: #00f2ff;
-  padding: 1rem;
-  font-family: 'Courier New', monospace;
-  min-width: 200px;
-  pointer-events: auto; /* Required to click the Dismiss button */
-  user-select: none;
-  box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+  padding: 4px 12px;
+  transition: all 0.3s ease;
 }
 
-.sat-card h3 { margin: 5px 0; font-size: 1.1rem; letter-spacing: 1px; }
-.card-header { font-size: 0.6rem; opacity: 0.7; }
-.tle { font-size: 0.6rem; color: #888; }
+.search-input-wrapper:focus-within {
+  border-bottom: 1px solid #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.minimal-search-input {
+  background: transparent;
+  border: none;
+  color: #fff;
+  padding: 8px 0;
+  font-size: 11px;
+  letter-spacing: 2px;
+  outline: none;
+  width: 100%;
+  text-align: right;
+  text-transform: uppercase;
+  font-family: 'Courier New', monospace;
+}
+
+.search-icon {
+  color: #00f2ff;
+  opacity: 0.6;
+  margin-left: 10px;
+  font-size: 14px;
+}
+
+/* 3. SEARCH RESULTS DROPDOWN */
+.minimal-results-dropdown {
+  background: rgba(5, 5, 10, 0.95);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(0, 242, 255, 0.2);
+  margin-top: 5px;
+  max-height: 250px;
+  overflow-y: auto;
+  pointer-events: auto;
+}
+
+.minimal-result-item {
+  padding: 10px 15px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: right;
+}
+
+.minimal-result-item:hover {
+  background: rgba(0, 242, 255, 0.1);
+  color: #fff;
+}
+
+.result-id {
+  color: #00f2ff;
+  margin-left: 8px;
+  opacity: 0.5;
+}
+
+/* 4. SUBTLE SATELLITE INFO CARD (FLOATING) */
+.sat-card {
+  background: rgba(0, 0, 0, 0.7) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-left: 3px solid #00f2ff !important;
+  color: #fff !important;
+  padding: 12px !important;
+  font-family: 'Courier New', monospace;
+  min-width: 180px;
+  pointer-events: auto;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.sat-card h3 {
+  margin: 0 0 5px 0;
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: #00f2ff;
+}
+
+.card-header {
+  font-size: 9px;
+  text-transform: uppercase;
+  opacity: 0.5;
+  margin-bottom: 4px;
+}
+
 .sat-card button {
   background: transparent;
-  border: 1px solid #00f2ff;
-  color: #00f2ff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
   cursor: pointer;
   margin-top: 10px;
   width: 100%;
-  font-size: 0.7rem;
+  font-size: 10px;
+  padding: 5px;
+  transition: all 0.2s;
+}
+
+.sat-card button:hover {
+  background: #ff4444;
+  border-color: #ff4444;
+}
+
+/* 5. SCROLLBAR STYLING */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 242, 255, 0.3);
 }

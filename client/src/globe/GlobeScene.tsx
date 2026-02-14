@@ -24,20 +24,6 @@ const SUN_DISTANCE = 200;
 // ... (imports remain the same)
 
 export function GlobeScene() {
-  function DebugSatellite() {
-    return (
-      <mesh
-        position={[0, 10, 0]}
-        onClick={() => alert("Debug Sat Clicked!")}
-        onPointerOver={() => (document.body.style.cursor = "pointer")}
-        onPointerOut={() => (document.body.style.cursor = "auto")}
-      >
-        <sphereGeometry args={[1, 16, 16]} />
-        <meshBasicMaterial color="red" />
-      </mesh>
-    );
-  }
-
   return (
     <Canvas
       flat
@@ -80,7 +66,6 @@ export function GlobeScene() {
         maxDistance={150}
         enablePan={false}
       />
-      <DebugSatellite />
     </Canvas>
   );
 }
