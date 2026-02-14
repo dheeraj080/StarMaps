@@ -66,3 +66,30 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+.sat-card {
+  background: rgba(0, 20, 40, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid #00f2ff;
+  border-left: 5px solid #00f2ff;
+  color: #00f2ff;
+  padding: 1rem;
+  font-family: 'Courier New', monospace;
+  min-width: 200px;
+  pointer-events: auto; /* Required to click the Dismiss button */
+  user-select: none;
+  box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+}
+
+.sat-card h3 { margin: 5px 0; font-size: 1.1rem; letter-spacing: 1px; }
+.card-header { font-size: 0.6rem; opacity: 0.7; }
+.tle { font-size: 0.6rem; color: #888; }
+.sat-card button {
+  background: transparent;
+  border: 1px solid #00f2ff;
+  color: #00f2ff;
+  cursor: pointer;
+  margin-top: 10px;
+  width: 100%;
+  font-size: 0.7rem;
+}
