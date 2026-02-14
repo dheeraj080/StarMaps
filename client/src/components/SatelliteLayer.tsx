@@ -88,7 +88,7 @@ export function SatelliteLayer() {
       frustumCulled={false} // Satellites move fast, don't cull
     >
       <boxGeometry args={[1, 1, 1]} />
-      <meshBasicMaterial color="#00ff00" />
+      <meshBasicMaterial color="#009dff" />
     </instancedMesh>
   );
 }
