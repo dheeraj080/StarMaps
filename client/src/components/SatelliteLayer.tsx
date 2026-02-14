@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useMemo, useState } from "react";
-import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import * as satellite from "satellite.js";
@@ -7,14 +7,14 @@ import * as satellite from "satellite.js";
 import { SatelliteSearch } from "./SatelliteSearch";
 import { SatelliteInfoCard } from "./SatelliteInfoCard";
 
-// Constants
 const EARTH_RADIUS_KM = 6371;
 const GAME_UNITS = 6.371;
 const SCALE = GAME_UNITS / EARTH_RADIUS_KM;
 
-// Optimized Temp Objects
+// Reuse objects to avoid Garbage Collection (GC) spikes
 const _obj = new THREE.Object3D();
 const _color = new THREE.Color();
+const _sphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 100);
 
 export function SatelliteLayer() {
   const meshRef = useRef<THREE.InstancedMesh>(null!);
@@ -25,7 +25,6 @@ export function SatelliteLayer() {
   const [cardPos, setCardPos] = useState<THREE.Vector3 | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // 1. Fetch
   useEffect(() => {
     fetch("http://localhost:8000/api/satellites/?limit=5000")
       .then((res) => res.json())
@@ -33,10 +32,10 @@ export function SatelliteLayer() {
       .catch(console.error);
   }, []);
 
-  // 2. Memoized Geometry & TLE Data
   const { geometry, satRecs } = useMemo(() => {
     const geo = new THREE.SphereGeometry(1, 6, 6);
-    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 100);
+    // Huge bounding sphere keeps the mesh "active" for the raycaster
+    geo.boundingSphere = _sphere.clone();
 
     const recs = data.map((rec) => ({
       ...rec,
@@ -46,7 +45,6 @@ export function SatelliteLayer() {
     return { geometry: geo, satRecs: recs };
   }, [data]);
 
-  // 3. Search Filtering
   const searchResults = useMemo(() => {
     if (searchTerm.length < 2) return [];
     return data
@@ -54,9 +52,9 @@ export function SatelliteLayer() {
       .slice(0, 8);
   }, [searchTerm, data]);
 
-  // 4. Update Loop
   useFrame(() => {
     if (!meshRef.current || satRecs.length === 0) return;
+
     const now = new Date();
     const gmst = satellite.gstime(now);
 
@@ -78,7 +76,7 @@ export function SatelliteLayer() {
         if (isSelected) {
           const currentPos = _obj.position.clone();
           setCardPos(currentPos);
-          // @ts-ignore - Smoothly track the satellite
+          // @ts-ignore - LERP for cinematic fly-to
           if (controls) controls.target.lerp(currentPos, 0.1);
         }
       }
@@ -87,17 +85,17 @@ export function SatelliteLayer() {
     meshRef.current.instanceMatrix.needsUpdate = true;
     if (meshRef.current.instanceColor)
       meshRef.current.instanceColor.needsUpdate = true;
+
+    // CRITICAL: Update the spatial bounds so the raycaster finds the moving satellites
+    meshRef.current.computeBoundingSphere();
   });
 
   if (satRecs.length === 0) return null;
 
   return (
     <group>
-      {/* 1. The HUD Search Bar */}
       <Html
-        // 1. This moves the HTML out of the Canvas and into the <body>
         portal={{ current: document.body }}
-        // 2. This ensures the container doesn't move with the camera
         calculatePosition={() => [0, 0]}
         style={{
           position: "absolute",
@@ -105,7 +103,7 @@ export function SatelliteLayer() {
           left: 0,
           width: "100vw",
           height: "100vh",
-          pointerEvents: "none", // Critical: allows clicking the globe
+          pointerEvents: "none",
         }}
       >
         <SatelliteSearch
@@ -119,7 +117,6 @@ export function SatelliteLayer() {
         />
       </Html>
 
-      {/* 2. The Satellites */}
       <instancedMesh
         key={satRecs.length}
         ref={meshRef}
@@ -129,13 +126,18 @@ export function SatelliteLayer() {
           e.stopPropagation();
           if (e.instanceId !== undefined) setSelectedSat(satRecs[e.instanceId]);
         }}
-        onPointerEnter={() => (document.body.style.cursor = "pointer")}
-        onPointerLeave={() => (document.body.style.cursor = "auto")}
+        // Use onPointerMove to catch fast moving objects
+        onPointerMove={(e) => {
+          e.stopPropagation();
+          document.body.style.cursor = "pointer";
+        }}
+        onPointerLeave={() => {
+          document.body.style.cursor = "auto";
+        }}
       >
         <meshBasicMaterial transparent opacity={0.9} />
       </instancedMesh>
 
-      {/* 3. The Follow-Label Info Card */}
       {selectedSat && cardPos && (
         <SatelliteInfoCard
           sat={selectedSat}
