@@ -24,6 +24,8 @@ export function SatelliteLayer() {
   const [data, setData] = useState<SatelliteRecord[]>([]);
   const [selectedSat, setSelectedSat] = useState<SatelliteRecord | null>(null);
   const [cardPos, setCardPos] = useState<THREE.Vector3 | null>(null);
+  const _sphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 100);
+  const [hovered, setHovered] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("http://localhost:8000/api/satellites/?limit=5000")
@@ -86,23 +88,32 @@ export function SatelliteLayer() {
     });
 
     meshRef.current.instanceMatrix.needsUpdate = true;
+    meshRef.current.geometry.boundingSphere = _sphere;
   });
 
   return (
     <group>
       <instancedMesh
+        // 2. Add a 'key'. When data changes, this forces a clean re-mount
+        key={satRecs.length}
         ref={meshRef}
+        // 3. Use the memoized geometry we defined earlier
         args={[geometry, undefined, satRecs.length]}
-        onClick={handlePointerDown}
         frustumCulled={false}
-        onPointerOver={() => (document.body.style.cursor = "pointer")}
+        onClick={handlePointerDown}
+        onPointerEnter={() => {
+          document.body.style.cursor = "pointer";
+        }}
+        onPointerLeave={() => {
+          document.body.style.cursor = "auto";
+        }}
       >
-        <meshBasicMaterial color="#00f2ff" />
+        <meshBasicMaterial color="#00f2ff" transparent opacity={0.9} />
       </instancedMesh>
 
       {selectedSat && cardPos && (
         <Html position={cardPos} distanceFactor={10}>
-          <div className="sat-card">
+          <div className="sat-card" style={{ pointerEvents: "auto" }}>
             <div className="card-header">NORAD TRACKING // ACTIVE</div>
             <h3>{selectedSat.name}</h3>
             <button onClick={() => setSelectedSat(null)}>CLOSE</button>
