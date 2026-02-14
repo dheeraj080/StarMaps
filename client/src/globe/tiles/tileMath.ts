@@ -30,6 +30,7 @@ export function latLonToUnitSphere(latDeg: number, lonDeg: number) {
   const lat = latDeg * Math.PI / 180;
   const lon = lonDeg * Math.PI / 180;
 
+  // Note: This assumes Y is North (Up)
   return {
     x: Math.cos(lat) * Math.cos(lon),
     y: Math.sin(lat),
@@ -37,4 +38,32 @@ export function latLonToUnitSphere(latDeg: number, lonDeg: number) {
   };
 }
 
-function radToDeg(r: number) { return r * 180 / Math.PI; }
+function radToDeg(r: number) {
+  return r * 180 / Math.PI;
+}
+
+// --- NEW HELPER FUNCTIONS BELOW ---
+
+/**
+ * Converts Visual 3D Coordinates (Y-Up) back to Lat/Lon.
+ * Use this for objects already in your Three.js scene.
+ */
+export function xyzToLatLon(x: number, y: number, z: number) {
+  const r = Math.sqrt(x * x + y * y + z * z);
+  // Based on latLonToUnitSphere above, Y is North
+  const lat = Math.asin(y / r) * (180 / Math.PI);
+  const lon = Math.atan2(z, x) * (180 / Math.PI);
+  return { lat, lng: lon, alt: r };
+}
+
+/**
+ * Converts Satellite Coordinates (ECEF, Z-Up) to Lat/Lon.
+ * Use this for raw data from TLE/Satellite.js/GPS.
+ */
+export function ecefToLatLon(x: number, y: number, z: number) {
+  const r = Math.sqrt(x * x + y * y + z * z);
+  // In standard ECEF, Z is North
+  const lat = Math.asin(z / r) * (180 / Math.PI);
+  const lon = Math.atan2(y, x) * (180 / Math.PI);
+  return { lat, lng: lon, alt: r };
+}
