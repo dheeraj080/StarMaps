@@ -9,10 +9,16 @@ from app.api.objects import router as objects_router
 
 app = FastAPI(title="StarMaps")
 
+origins = [
+    "https://dheeraj080.github.io/StarMaps/",
+    "http://localhost:5173",
+    "http://localhost:4173"
+]
+
 # <-- Add this block
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
