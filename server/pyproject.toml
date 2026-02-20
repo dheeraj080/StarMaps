@@ -5,8 +5,7 @@ package-mode = false  # <-- Add this line
 description = "Backend for StarMaps satellite tracker"
 authors = ["Dheeraj <your@email.com>"]
 
-[tool.poetry.dependencies]
-# ... your dependencies ...
+
 [tool.poetry.dependencies]
 fastapi = "0.115.8"
 uvicorn = {extras = ["standard"], version = "0.34.0"}
