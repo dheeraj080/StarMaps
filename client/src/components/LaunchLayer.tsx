@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
-import * as THREE from "three";
+import { useEffect, useState } from "react";
 import { Html } from "@react-three/drei";
 import { apiGet } from "../api/client";
 import { latLonToUnitSphere } from "../globe/tiles/tileMath";
+import type { Launch } from "../types/models";
+import type { Resp } from "../types/api";
 
 // --- Sub-component for the T-Minus Timer ---
 function Countdown({ targetDate }: { targetDate: string }) {
@@ -51,11 +52,23 @@ export function LaunchesLayer({ radius }: { radius: number }) {
   const [selectedLaunch, setSelectedLaunch] = useState<Launch | null>(null);
 
   useEffect(() => {
-    apiGet<Resp>("/api/launches/upcoming")
+    let cancelled = false;
+
+    apiGet<Resp<Launch[]>>("/api/launches/upcoming")
       .then((d) => {
-        if (d && d.results) setLaunches(d.results);
+        if (cancelled) return;
+        if (d?.results) setLaunches(d.results);
+        else setLaunches([]);
       })
-      .catch((e) => console.error("Launches fetch failed.", e));
+      .catch(() => {
+        if (cancelled) return;
+        // No backend for now: just run with no launches
+        setLaunches([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (

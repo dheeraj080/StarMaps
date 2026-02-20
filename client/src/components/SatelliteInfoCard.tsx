@@ -1,31 +1,33 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { Html } from "@react-three/drei";
+import * as THREE from "three"; // Added missing import
 
 interface InfoCardProps {
   sat: any;
   onClose: () => void;
+  position?: THREE.Vector3; // Prop is correctly defined here
 }
 
-export function SatelliteInfoCard({ sat, onClose }: InfoCardProps) {
+// FIX: Added 'position' to the destructured arguments below
+export function SatelliteInfoCard({
+  sat,
+  onClose,
+  position: _position,
+}: InfoCardProps) {
   if (!sat) return null;
 
-  // Memoize orbit calculations so they don't re-run unless the satellite changes
   const orbitInfo = useMemo(() => {
     const id = parseInt(sat.id);
     if (isNaN(id)) return "UNKNOWN";
-    // Geosynchronous orbits are generally above 35,000km,
-    // but in satellite catalogs, high IDs often signify specific constellations.
     return id > 40000 ? "HEO/GEO" : "LEO/MEO";
   }, [sat.id]);
 
   return (
     <Html
       portal={{ current: document.body }}
-      // Anchors the HTML to the top-left of the screen (0,0)
       calculatePosition={() => [0, 0]}
       style={{ pointerEvents: "none" }}
     >
-      {/* The 'side-aligned' class in your CSS should handle the 'right: 30px' positioning */}
       <div
         className="pro-hud-card side-aligned"
         style={{ pointerEvents: "auto" }}
@@ -49,6 +51,7 @@ export function SatelliteInfoCard({ sat, onClose }: InfoCardProps) {
               <label>ORBIT_REGIME</label>
               <span>{orbitInfo}</span>
             </div>
+            {/* Logic check: If position prop is used later for distance math, it's ready here */}
             <div className="stat-row">
               <label>EPOCH_REF</label>
               <span>{new Date().toLocaleDateString()}</span>
@@ -62,7 +65,6 @@ export function SatelliteInfoCard({ sat, onClose }: InfoCardProps) {
           </button>
         </div>
 
-        {/* Animated scanning line for that high-tech feel */}
         <div className="hud-scanner-line" />
       </div>
     </Html>

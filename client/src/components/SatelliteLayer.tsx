@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useMemo, useState } from "react";
+import { useEffect, useRef, useMemo, useState } from "react"; // Removed 'React'
 import { useFrame, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import * as satellite from "satellite.js";
+import { OrbitControls } from "three-stdlib";
 
 import { SatelliteSearch } from "./SatelliteSearch";
 import { SatelliteInfoCard } from "./SatelliteInfoCard";
@@ -20,7 +21,6 @@ const _sphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 100);
 
 export function SatelliteLayer() {
   const meshRef = useRef<THREE.InstancedMesh>(null!);
-  // NEW: Ref for the ground target ring
   const groundTrackRef = useRef<THREE.Mesh>(null!);
   const { controls, camera } = useThree();
 
@@ -33,17 +33,14 @@ export function SatelliteLayer() {
     const loadSatellites = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/satellites/?limit=5000`);
-
         if (!res.ok) throw new Error("Backend unavailable");
-
         const json = await res.json();
         setData(json);
       } catch (err) {
         console.warn("Server not available. Running in static mode.");
-        setData([]); // fallback so UI doesn't crash
+        setData([]);
       }
     };
-
     loadSatellites();
   }, []);
 
@@ -72,7 +69,9 @@ export function SatelliteLayer() {
 
     satRecs.forEach((sat, i) => {
       const posVel = satellite.propagate(sat.satrec, now);
-      if (posVel.position && typeof posVel.position !== "boolean") {
+
+      // FIX: Improved Null/Boolean check for TypeScript
+      if (posVel && typeof posVel !== "boolean" && posVel.position) {
         const posGd = satellite.eciToEcf(posVel.position, gmst);
         const isSelected = selectedSat?.id === sat.id;
 
@@ -85,30 +84,22 @@ export function SatelliteLayer() {
         _color.set(isSelected ? "#ffffff" : "#00f2ff");
         meshRef.current.setColorAt(i, _color);
 
-        if (selectedSat) {
-          // Find the position of the currently selected satellite in the loop
+        if (isSelected) {
           const satPos = _obj.position.clone();
-
-          // GUARD: Ensure we don't lock onto (0,0,0) before the data is ready
           if (satPos.length() > 1) {
             setCardPos(satPos);
 
             if (controls) {
-              // Smoothly follow the target
-              // @ts-ignore
-              controls.target.lerp(satPos, 0.1);
+              // FIX: Cast controls to OrbitControls to access .target
+              const orbControls = controls as unknown as OrbitControls;
+              orbControls.target.lerp(satPos, 0.1);
 
-              // Only force camera position if we want a "Locked" chase view
-              // Adjust the '3' to change how far back the 'Chase Cam' sits
               const idealCamPos = satPos
                 .clone()
                 .normalize()
                 .multiplyScalar(satPos.length() + 3);
               camera.position.lerp(idealCamPos, 0.05);
-
-              // This is the line that actually "commits" the movement
-              // @ts-ignore
-              controls.update();
+              orbControls.update();
             }
           }
         }
@@ -137,7 +128,7 @@ export function SatelliteLayer() {
           pointerEvents: "none",
         }}
       >
-        <div className="hud-sidebar-right">
+        <div className="hud-sidebar-right" style={{ pointerEvents: "auto" }}>
           <SatelliteSearch
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
@@ -147,18 +138,6 @@ export function SatelliteLayer() {
               setSearchTerm("");
             }}
           />
-          // Inside SatelliteLayer.tsx
-          {selectedSat && (
-            <SatelliteInfoCard
-              sat={selectedSat}
-              onClose={() => {
-                setSelectedSat(null); // This kills the camera lock
-                if (controls) {
-                  controls.target.set(0, 0, 0);
-                }
-              }}
-            />
-          )}
         </div>
       </Html>
 
@@ -182,7 +161,6 @@ export function SatelliteLayer() {
         <meshBasicMaterial transparent opacity={0.3} />
       </instancedMesh>
 
-      {/* NEW: Ground Track Visual (The "Shadow" Ring) */}
       {selectedSat && (
         <mesh ref={groundTrackRef}>
           <ringGeometry args={[0.08, 0.1, 32]} />
@@ -192,11 +170,16 @@ export function SatelliteLayer() {
 
       {selectedSat && <OrbitPath satrec={selectedSat.satrec} scale={SCALE} />}
 
+      {/* Note: Ensure SatelliteInfoCard interface includes 'position?: THREE.Vector3' */}
       {selectedSat && cardPos && (
         <SatelliteInfoCard
           sat={selectedSat}
           position={cardPos}
-          onClose={() => setSelectedSat(null)}
+          onClose={() => {
+            setSelectedSat(null);
+            if (controls)
+              (controls as unknown as OrbitControls).target.set(0, 0, 0);
+          }}
         />
       )}
     </group>

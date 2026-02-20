@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from "react";
+import { useMemo, useEffect } from "react";
 import { extend } from "@react-three/fiber";
 import ThreeGlobe from "three-globe";
 import * as THREE from "three";
@@ -11,7 +11,6 @@ interface EarthProps {
 
 export function Earth({ radius }: EarthProps) {
   const globe = useMemo(() => {
-    // 1. Define 'g' properly
     const g = new ThreeGlobe()
       .globeImageUrl(
         "//unpkg.com/three-globe/example/img/earth-blue-marble.jpg",
@@ -21,12 +20,9 @@ export function Earth({ radius }: EarthProps) {
       .atmosphereColor("lightskyblue")
       .atmosphereAltitude(0.15);
 
-    // 2. Disable Raycasting for the entire globe and its atmosphere
-    // This allows the "laser" to pass through to the satellites
-    g.raycast = () => null;
-
-    // Safety: ensure all children are also unclickable
-    g.traverse((obj) => {
+    // Disable raycasting for globe + atmosphere so satellites are clickable
+    (g as any).raycast = () => null;
+    g.traverse((obj: any) => {
       obj.raycast = () => null;
     });
 
@@ -44,10 +40,7 @@ export function Earth({ radius }: EarthProps) {
   const scale = radius / 100;
 
   return (
-    <group
-      scale={[scale, scale, scale]}
-      pointerEvents="none" // Tells R3F to ignore this entire group for raycasting
-    >
+    <group scale={[scale, scale, scale]}>
       <primitive object={globe} />
     </group>
   );

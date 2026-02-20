@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import React, { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react"; // Removed 'React'
 import { useFrame, useThree } from "@react-three/fiber";
 import CameraControls from "camera-controls";
 
@@ -10,7 +10,6 @@ type Props = {
 };
 
 function intersectSphere(origin: THREE.Vector3, dir: THREE.Vector3, r: number) {
-  // Solve |o + t d|^2 = r^2
   const a = dir.dot(dir);
   const b = 2 * origin.dot(dir);
   const c = origin.dot(origin) - r * r;
@@ -22,10 +21,10 @@ function intersectSphere(origin: THREE.Vector3, dir: THREE.Vector3, r: number) {
 }
 
 export function GlobeControls({ radius }: Props) {
-  const { camera, gl, size } = useThree();
+  // Removed 'size' as it was causing TS6133
+  const { camera, gl } = useThree();
   const controlsRef = useRef<CameraControls | null>(null);
 
-  // A shared raycaster for “zoom to cursor”
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const ndc = useMemo(() => new THREE.Vector2(), []);
 
@@ -33,44 +32,40 @@ export function GlobeControls({ radius }: Props) {
     const controls = new CameraControls(camera, gl.domElement);
     controlsRef.current = controls;
 
-    // Cesium-ish defaults
-    controls.dollyToCursor = true; // BIG one: zoom towards mouse
-    controls.dragToOffset = true; // pan moves target
-    controls.minDistance = radius * 1.05; // don’t go inside Earth
-    controls.maxDistance = radius * 200; // far zoom
-    controls.smoothTime = 0.15; // inertia feel
+    controls.dollyToCursor = true;
+    controls.dragToOffset = true;
+    controls.minDistance = radius * 1.05;
+    controls.maxDistance = radius * 200;
+    controls.smoothTime = 0.15;
+
     controls.mouseButtons.left = CameraControls.ACTION.ROTATE;
     controls.mouseButtons.middle = CameraControls.ACTION.DOLLY;
-    controls.mouseButtons.right = CameraControls.ACTION.TRUCK; // pan
-    controls.touches.one = CameraControls.ACTION.TOUCH_ROTATE;
-    controls.touches.two = CameraControls.ACTION.TOUCH_TRUCK_DOLLY;
+    controls.mouseButtons.right = CameraControls.ACTION.TRUCK;
 
-    // Initial view
+    controls.touches.one = CameraControls.ACTION.TOUCH_ROTATE;
+    // FIX: TOUCH_TRUCK_DOLLY -> TOUCH_ZOOM_TRUCK (Standard CameraControls API)
+    controls.touches.two = CameraControls.ACTION.TOUCH_ZOOM_TRUCK;
+
     controls.setLookAt(0, 0, radius * 3, 0, 0, 0, false);
 
-    return () => controls.destroy();
+    // FIX: .destroy() -> .dispose()
+    return () => controls.dispose();
   }, [camera, gl.domElement, radius]);
 
-  // OPTIONAL: keep target on/near the globe when panning
-  // (Cesium pans across the surface)
   useFrame((_, delta) => {
     const controls = controlsRef.current;
     if (!controls) return;
 
-    // Update controls
     controls.update(delta);
 
-    // Clamp target to globe surface if it drifts away
     const target = controls.getTarget(new THREE.Vector3());
     const len = target.length();
     if (len > 0.0001) {
-      // Keep target near surface
       target.setLength(radius);
       controls.setTarget(target.x, target.y, target.z, false);
     }
   });
 
-  // Cesium-like: double click flies to the clicked surface point
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
@@ -89,10 +84,8 @@ export function GlobeControls({ radius }: Props) {
       );
       if (!hit) return;
 
-      // Fly close-ish to that point
-      const camPos = camera.position.clone();
       const dir = hit.clone().normalize();
-      const newCam = dir.clone().multiplyScalar(radius * 2.5); // tune
+      const newCam = dir.clone().multiplyScalar(radius * 2.5);
 
       controls.setLookAt(
         newCam.x,
