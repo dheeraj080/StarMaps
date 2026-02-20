@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "starmaps-backend"
+version = "0.1.0"
+description = "Backend for StarMaps satellite tracker"
+authors = ["Dheeraj <your@email.com>"]
+
+[tool.poetry.dependencies]
+fastapi==0.115.8
+uvicorn[standard]==0.34.0
+sqlalchemy==2.0.38
+asyncpg==0.30.0
+httpx==0.28.1
+python-dotenv==1.0.1
+pydantic==2.10.6
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
