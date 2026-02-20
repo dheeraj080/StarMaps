@@ -1,6 +1,3 @@
-// src/api/client.ts
-
-// Change this to match your new Docker port (8000)
 const BASE_URL = "http://localhost:8000"; 
 
 export async function apiGet<T>(endpoint: string): Promise<T> {

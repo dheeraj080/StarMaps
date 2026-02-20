@@ -27,7 +27,12 @@ export function GlobeScene() {
   return (
     <Canvas
       flat
-      camera={{ position: [0, 0, 25], fov: 45 }}
+      camera={{
+        position: [0, 0, 25],
+        fov: 45,
+        near: 0.1, // Ensure this is not 0
+        far: 1000, // Ensure this is large enough to see the Earth
+      }}
       // Increased threshold makes it easier to click small satellites
       raycaster={{
         params: { Mesh: { threshold: 0.5 } },

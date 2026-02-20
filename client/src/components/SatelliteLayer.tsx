@@ -6,19 +6,23 @@ import * as satellite from "satellite.js";
 
 import { SatelliteSearch } from "./SatelliteSearch";
 import { SatelliteInfoCard } from "./SatelliteInfoCard";
+import { OrbitPath } from "./OrbitPath";
+
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 const EARTH_RADIUS_KM = 6371;
 const GAME_UNITS = 6.371;
 const SCALE = GAME_UNITS / EARTH_RADIUS_KM;
 
-// Reuse objects to avoid Garbage Collection (GC) spikes
 const _obj = new THREE.Object3D();
 const _color = new THREE.Color();
 const _sphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 100);
 
 export function SatelliteLayer() {
   const meshRef = useRef<THREE.InstancedMesh>(null!);
-  const { controls } = useThree();
+  // NEW: Ref for the ground target ring
+  const groundTrackRef = useRef<THREE.Mesh>(null!);
+  const { controls, camera } = useThree();
 
   const [data, setData] = useState<any[]>([]);
   const [selectedSat, setSelectedSat] = useState<any | null>(null);
@@ -26,22 +30,30 @@ export function SatelliteLayer() {
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/satellites/?limit=5000")
-      .then((res) => res.json())
-      .then(setData)
-      .catch(console.error);
+    const loadSatellites = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/satellites/?limit=5000`);
+
+        if (!res.ok) throw new Error("Backend unavailable");
+
+        const json = await res.json();
+        setData(json);
+      } catch (err) {
+        console.warn("Server not available. Running in static mode.");
+        setData([]); // fallback so UI doesn't crash
+      }
+    };
+
+    loadSatellites();
   }, []);
 
   const { geometry, satRecs } = useMemo(() => {
     const geo = new THREE.SphereGeometry(1, 6, 6);
-    // Huge bounding sphere keeps the mesh "active" for the raycaster
     geo.boundingSphere = _sphere.clone();
-
     const recs = data.map((rec) => ({
       ...rec,
       satrec: satellite.twoline2satrec(rec.line1, rec.line2),
     }));
-
     return { geometry: geo, satRecs: recs };
   }, [data]);
 
@@ -65,7 +77,7 @@ export function SatelliteLayer() {
         const isSelected = selectedSat?.id === sat.id;
 
         _obj.position.set(posGd.x * SCALE, posGd.z * SCALE, -posGd.y * SCALE);
-        const s = isSelected ? 0.25 : 0.12;
+        const s = 0.12;
         _obj.scale.set(s, s, s);
         _obj.updateMatrix();
         meshRef.current.setMatrixAt(i, _obj.matrix);
@@ -73,11 +85,32 @@ export function SatelliteLayer() {
         _color.set(isSelected ? "#ffffff" : "#00f2ff");
         meshRef.current.setColorAt(i, _color);
 
-        if (isSelected) {
-          const currentPos = _obj.position.clone();
-          setCardPos(currentPos);
-          // @ts-ignore - LERP for cinematic fly-to
-          if (controls) controls.target.lerp(currentPos, 0.1);
+        if (selectedSat) {
+          // Find the position of the currently selected satellite in the loop
+          const satPos = _obj.position.clone();
+
+          // GUARD: Ensure we don't lock onto (0,0,0) before the data is ready
+          if (satPos.length() > 1) {
+            setCardPos(satPos);
+
+            if (controls) {
+              // Smoothly follow the target
+              // @ts-ignore
+              controls.target.lerp(satPos, 0.1);
+
+              // Only force camera position if we want a "Locked" chase view
+              // Adjust the '3' to change how far back the 'Chase Cam' sits
+              const idealCamPos = satPos
+                .clone()
+                .normalize()
+                .multiplyScalar(satPos.length() + 3);
+              camera.position.lerp(idealCamPos, 0.05);
+
+              // This is the line that actually "commits" the movement
+              // @ts-ignore
+              controls.update();
+            }
+          }
         }
       }
     });
@@ -85,8 +118,6 @@ export function SatelliteLayer() {
     meshRef.current.instanceMatrix.needsUpdate = true;
     if (meshRef.current.instanceColor)
       meshRef.current.instanceColor.needsUpdate = true;
-
-    // CRITICAL: Update the spatial bounds so the raycaster finds the moving satellites
     meshRef.current.computeBoundingSphere();
   });
 
@@ -106,15 +137,29 @@ export function SatelliteLayer() {
           pointerEvents: "none",
         }}
       >
-        <SatelliteSearch
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          results={searchResults}
-          onSelect={(sat) => {
-            setSelectedSat(sat);
-            setSearchTerm("");
-          }}
-        />
+        <div className="hud-sidebar-right">
+          <SatelliteSearch
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            results={searchResults}
+            onSelect={(sat) => {
+              setSelectedSat(sat);
+              setSearchTerm("");
+            }}
+          />
+          // Inside SatelliteLayer.tsx
+          {selectedSat && (
+            <SatelliteInfoCard
+              sat={selectedSat}
+              onClose={() => {
+                setSelectedSat(null); // This kills the camera lock
+                if (controls) {
+                  controls.target.set(0, 0, 0);
+                }
+              }}
+            />
+          )}
+        </div>
       </Html>
 
       <instancedMesh
@@ -126,7 +171,6 @@ export function SatelliteLayer() {
           e.stopPropagation();
           if (e.instanceId !== undefined) setSelectedSat(satRecs[e.instanceId]);
         }}
-        // Use onPointerMove to catch fast moving objects
         onPointerMove={(e) => {
           e.stopPropagation();
           document.body.style.cursor = "pointer";
@@ -135,8 +179,18 @@ export function SatelliteLayer() {
           document.body.style.cursor = "auto";
         }}
       >
-        <meshBasicMaterial transparent opacity={0.9} />
+        <meshBasicMaterial transparent opacity={0.3} />
       </instancedMesh>
+
+      {/* NEW: Ground Track Visual (The "Shadow" Ring) */}
+      {selectedSat && (
+        <mesh ref={groundTrackRef}>
+          <ringGeometry args={[0.08, 0.1, 32]} />
+          <meshBasicMaterial color="#00f2ff" transparent opacity={0.6} />
+        </mesh>
+      )}
+
+      {selectedSat && <OrbitPath satrec={selectedSat.satrec} scale={SCALE} />}
 
       {selectedSat && cardPos && (
         <SatelliteInfoCard

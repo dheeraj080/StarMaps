@@ -30,12 +30,11 @@ export function SatelliteSearch({
         <div className="minimal-results-dropdown">
           {results.map((sat) => (
             <div
-              key={sat.id}
+              key={sat.id} // Ensure this is a unique ID from your API
               className="minimal-result-item"
               onClick={() => onSelect(sat)}
             >
-              <span className="result-name">{sat.name}</span>
-              <span className="result-id">[{sat.id}]</span>
+              {sat.name} <span className="result-id">[{sat.id}]</span>
             </div>
           ))}
         </div>

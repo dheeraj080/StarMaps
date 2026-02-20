@@ -7,18 +7,17 @@ interface OrbitPathProps {
   scale: number;
 }
 
-export function OrbitPath({ satrec, scale }: OrbitPathProps) {
+export function OrbitPath({ satrec, scale }: { satrec: any; scale: number }) {
   const points = useMemo(() => {
+    // CRITICAL: Ensure satellite record is initialized
+    if (!satrec || !satrec.error === undefined) return [];
+
     const pathPoints: THREE.Vector3[] = [];
-    const now = new Date();
-
-    // Calculate 90 minutes of orbit in 2-minute increments
     for (let i = 0; i <= 90; i += 2) {
-      const time = new Date(now.getTime() + i * 60000);
-      const gmst = satellite.gstime(time);
-      const posVel = satellite.propagate(satrec, time);
-
+      const date = new Date(Date.now() + i * 60000);
+      const posVel = satellite.propagate(satrec, date);
       if (posVel.position && typeof posVel.position !== "boolean") {
+        const gmst = satellite.gstime(date);
         const posGd = satellite.eciToEcf(posVel.position, gmst);
         pathPoints.push(
           new THREE.Vector3(posGd.x * scale, posGd.z * scale, -posGd.y * scale),
@@ -28,19 +27,15 @@ export function OrbitPath({ satrec, scale }: OrbitPathProps) {
     return pathPoints;
   }, [satrec, scale]);
 
-  const geometry = useMemo(
-    () => new THREE.BufferGeometry().setFromPoints(points),
-    [points],
-  );
+  if (points.length < 2) return null;
 
   return (
-    <line geometry={geometry}>
-      <lineBasicMaterial
-        color="#ffffff"
-        transparent
-        opacity={0.4}
-        linewidth={1}
+    <line>
+      <bufferGeometry
+        attach="geometry"
+        onUpdate={(self) => self.setFromPoints(points)}
       />
+      <lineBasicMaterial color="#00f2ff" transparent opacity={0.3} />
     </line>
   );
 }

@@ -15,7 +15,7 @@ export function Moon({ radius }: MoonProps) {
     const loader = new THREE.TextureLoader();
     loader.setCrossOrigin("anonymous");
     loader.load(
-      "https://unpkg.com/three-globe/example/img/moon.jpg", // Use HTTPS directly
+      "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg", // Use HTTPS directly
       (t) => {
         t.colorSpace = THREE.SRGBColorSpace;
         setTex(t);

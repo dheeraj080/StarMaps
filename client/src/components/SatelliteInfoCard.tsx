@@ -1,40 +1,69 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Html } from "@react-three/drei";
-import * as THREE from "three";
 
 interface InfoCardProps {
   sat: any;
-  position: THREE.Vector3;
   onClose: () => void;
 }
 
-export function SatelliteInfoCard({ sat, position, onClose }: InfoCardProps) {
+export function SatelliteInfoCard({ sat, onClose }: InfoCardProps) {
+  if (!sat) return null;
+
+  // Memoize orbit calculations so they don't re-run unless the satellite changes
+  const orbitInfo = useMemo(() => {
+    const id = parseInt(sat.id);
+    if (isNaN(id)) return "UNKNOWN";
+    // Geosynchronous orbits are generally above 35,000km,
+    // but in satellite catalogs, high IDs often signify specific constellations.
+    return id > 40000 ? "HEO/GEO" : "LEO/MEO";
+  }, [sat.id]);
+
   return (
-    <Html position={position} distanceFactor={10}>
-      <div className="sat-card" style={{ padding: "10px", minWidth: "150px" }}>
-        <div style={{ fontSize: "9px", color: "#00f2ff", opacity: 0.8 }}>
-          TRACKING_ACTIVE
+    <Html
+      portal={{ current: document.body }}
+      // Anchors the HTML to the top-left of the screen (0,0)
+      calculatePosition={() => [0, 0]}
+      style={{ pointerEvents: "none" }}
+    >
+      {/* The 'side-aligned' class in your CSS should handle the 'right: 30px' positioning */}
+      <div
+        className="pro-hud-card side-aligned"
+        style={{ pointerEvents: "auto" }}
+      >
+        <div className="hud-header">
+          <div className="hud-glitch-effect" data-text="TARGET_LOCK">
+            TARGET_LOCK
+          </div>
+          <span className="hud-status">SIGNAL_STRENGTH: 98%</span>
         </div>
-        <h4 style={{ margin: "4px 0", fontSize: "13px", color: "#fff" }}>
-          {sat.name}
-        </h4>
-        <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)" }}>
-          ALT: {(position.length() * 1000).toFixed(0)} KM
+
+        <div className="hud-body">
+          <h2 className="hud-title">{sat.name || "NOC_IDENTITY_UNK"}</h2>
+
+          <div className="hud-stats-grid">
+            <div className="stat-row">
+              <label>NORAD_ID</label>
+              <span className="value-highlight">{sat.id}</span>
+            </div>
+            <div className="stat-row">
+              <label>ORBIT_REGIME</label>
+              <span>{orbitInfo}</span>
+            </div>
+            <div className="stat-row">
+              <label>EPOCH_REF</label>
+              <span>{new Date().toLocaleDateString()}</span>
+            </div>
+          </div>
         </div>
-        <button
-          onClick={onClose}
-          style={{
-            marginTop: "8px",
-            background: "transparent",
-            border: "none",
-            color: "#ff4444",
-            fontSize: "9px",
-            cursor: "pointer",
-            padding: 0,
-          }}
-        >
-          [ DISCONNECT ]
-        </button>
+
+        <div className="hud-footer">
+          <button className="hud-abort-btn" onClick={onClose}>
+            CLOSE
+          </button>
+        </div>
+
+        {/* Animated scanning line for that high-tech feel */}
+        <div className="hud-scanner-line" />
       </div>
     </Html>
   );
