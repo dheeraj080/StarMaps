@@ -93,7 +93,13 @@ export const MapView: React.FC = () => {
       </div>
 
       <Map
-        initialViewState={{ longitude, latitude, zoom: 1.8, pitch: 40 }}
+        initialViewState={{
+          longitude: 0, // Center on Prime Meridian
+          latitude: 0, // Equator
+          zoom: 3, // Zoomed out enough to see curvature
+          pitch: 0, // Flat = perfectly centered globe
+          bearing: 0,
+        }}
         mapStyle={theme === "dark" ? darkMapStyle : lightMapStyle}
         attributionControl={false}
         projection={{ type: projection }} // ✅ this sets it at construction
