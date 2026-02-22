@@ -1,7 +1,0 @@
-# Physical constants
-EARTH_RADIUS_KM = 6371.0
-MOON_RADIUS_KM = 1737.4
-
-# Scaling for coordinate conversion
-SCENE_UNIT_SCALE = 0.001
-EARTH_RADIUS_SCENE = EARTH_RADIUS_KM * SCENE_UNIT_SCALE
