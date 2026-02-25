@@ -1,10 +1,5 @@
 import { TLE } from "../interfaces/tle";
 
-/**
- * Get the TLE data for a satellite from the NORAD catalog
- * @param satId - Satellite ID from the NORAD catalog
- * @returns Promise<TLE> - TLE data for the satellite
- */
 export async function getSatTLE(satId: string): Promise<TLE> {
     if (!satId) {
         throw new Error("Satellite ID is required");
