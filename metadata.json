@@ -1,0 +1,5 @@
+{
+  "name": "StarMaps",
+  "description": "Real-time satellite tracking dashboard with 3D globe visualization and orbital data.",
+  "requestFramePermissions": []
+}
